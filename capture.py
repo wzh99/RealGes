@@ -27,10 +27,10 @@ class Camera:
     def __del__(self):
         self.pipeline.stop()
 
-    def capture(self) -> (np.ndarray, np.ndarray):
+    def capture(self) -> [np.ndarray]:
         """
         Capture an coherent pair of depth and color image.
-        :return: tuple(depth_img, color_img)
+        :return: list[depth_image, color_image]
         """
         # Wait for a coherent pair of frames
         frames = self.pipeline.wait_for_frames()
@@ -43,4 +43,4 @@ class Camera:
         # Convert images to np.array
         depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
-        return depth_image, color_image
+        return [depth_image, color_image]

@@ -11,11 +11,18 @@ cr_range = (133, 173)  # Cr component range
 cb_range = (77, 127)  # Cb component range
 min_contour_area = 10000  # minimum acceptable hand contour area
 
-if __name__ == '__main__':
-    camera = Camera()
-    while cv2.waitKey(1) != 27:
-        # Retrieve image from camera
-        depth_image, color_image = camera.capture()
+
+class Preprocessor:
+    def __init__(self):
+        pass
+
+    def segment_one_frame(self, captured: [np.ndarray]) -> [np.ndarray]:
+        """
+        Segment out hand in one pair of depth and gradient images
+        :return: [segmented_depth, segmented_gradient]
+        """
+        # Split image list
+        depth_image, color_image = captured[0], captured[1]
 
         # Create mask from depth
         # Filter out depth that fall out of accepted range
@@ -24,6 +31,8 @@ if __name__ == '__main__':
         depth_mask = cv2.medianBlur(depth_mask, median_size)
         # Expand the mask a bit
         depth_mask = cv2.dilate(depth_mask, np.ones((dilation_size, dilation_size)))
+        # Fill holes in depth mask
+        depth_mask = self.fill_hole(depth_mask)
 
         # Create mask from color
         # De-noise with median filter
@@ -36,6 +45,8 @@ if __name__ == '__main__':
         cr_mask = cv2.inRange(ycrcb_split[1], cr_range[0], cr_range[1])
         cb_mask = cv2.inRange(ycrcb_split[2], cb_range[0], cb_range[1])
         color_mask = cr_mask & cb_mask
+        # Fill holes in color mask
+        color_mask = self.fill_hole(color_mask)
 
         # Combine two masks
         combined_mask = depth_mask & color_mask
@@ -54,5 +65,36 @@ if __name__ == '__main__':
         if hand_contour is not None:
             poly_points = hand_contour.reshape(len(hand_contour), 2)
             cv2.fillPoly(hand_mask, [poly_points], 255)
-        masked_color = cv2.copyTo(color_image, hand_mask)
-        cv2.imshow("Segmentation", masked_color)
+
+        # Show masked depth image
+        scaled_depth = cv2.convertScaleAbs(depth_image, alpha=0.03)
+        masked_depth = cv2.copyTo(scaled_depth, hand_mask)
+
+        # Compute gradient of grayscale image
+        gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+        gradient_image = cv2.Sobel(gray_image, -1, 1, 1, ksize=5)
+        masked_gradient = cv2.copyTo(gradient_image, hand_mask)
+
+        return [masked_depth, masked_gradient]
+
+    @staticmethod
+    def fill_hole(mask: np.ndarray) -> np.ndarray:
+        """
+        File holes in the mask
+        :param mask: mask to be filled
+        :return: filled result
+        """
+        shape = np.array(mask.shape)
+        fill = np.zeros(shape + 2, np.uint8)
+        fill[1:shape[0] + 1, 1:shape[1] + 1] = mask.copy()
+        cv2.floodFill(fill, np.zeros(shape + 4, np.uint8), (0, 0), 255)
+        return mask | ~fill[1:shape[0] + 1, 1:shape[1] + 1]
+
+
+if __name__ == '__main__':
+    camera = Camera()
+    proc = Preprocessor()
+    while cv2.waitKey(1) != 27:
+        captured = camera.capture()
+        segmented = proc.segment_one_frame(camera.capture())
+        cv2.imshow("Result", np.hstack(segmented))
