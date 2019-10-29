@@ -79,25 +79,23 @@ class StoreThread(threading.Thread):
 
     def run(self) -> None:
         # Create gesture directory if not found
-        gesture_dir = "%s/%s" % (self.path, gesture.category_names[self.gesture])
+        gesture_dir = os.path.join(self.path, gesture.category_names[self.gesture])
         if not os.path.exists(gesture_dir):
             os.mkdir(gesture_dir)
 
         # Create current sequence folder with local time
-        local_time = time.localtime(time.time())
-        time_str = time.strftime("%m%d%H%M%S", local_time)
-        seq_dir = "%s/%d" % (gesture_dir, int(time.time()))
+        seq_dir = os.path.join(gesture_dir, "%d" % int(time.time()))
         os.mkdir(seq_dir)
         print("storing to %s" % seq_dir)
 
         # Store depth and gradient image, separately
         depth_seq, gradient_seq = self.seq
         for i in range(len(depth_seq)):
-            filename = "%s/d%02d.jpg" % (seq_dir, i)
+            filename = os.path.join(seq_dir, "d%02d.jpg" % i)
             print(filename)
             cv2.imwrite(filename, depth_seq[i])
         for i in range(len(gradient_seq)):
-            filename = "%s/g%02d.jpg" % (seq_dir, i)
+            filename = os.path.join(seq_dir, "g%02d.jpg" % i)
             print(filename)
             cv2.imwrite(filename, gradient_seq[i])
 
@@ -107,7 +105,7 @@ class Recorder:
     A video recorder that can record frame sequences for dataset creation and realtime capturing.
     """
 
-    def __init__(self, camera: Camera, path: str = "./"):
+    def __init__(self, camera: Camera, path: str = "."):
         """
         Constructor
         :param camera: Camera object

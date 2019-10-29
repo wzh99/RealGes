@@ -10,6 +10,7 @@ dilation_size = 5  # dilation kernel size
 cr_range = (133, 173)  # Cr component range
 cb_range = (77, 127)  # Cb component range
 min_contour_area = 10000  # minimum acceptable hand contour area
+sequence_length = 16  # target length of processed sequence
 
 
 def segment_one_frame(captured_list: List[np.ndarray], depth_scale: float) -> List[np.ndarray]:
@@ -28,7 +29,7 @@ def segment_one_frame(captured_list: List[np.ndarray], depth_scale: float) -> Li
     # Expand the mask a bit
     depth_mask = cv2.dilate(depth_mask, np.ones((dilation_size, dilation_size)))
     # Fill holes in depth mask
-    depth_mask = fill_hole(depth_mask)
+    depth_mask = _fill_hole(depth_mask)
 
     # Create mask from color
     # De-noise with median filter
@@ -42,7 +43,7 @@ def segment_one_frame(captured_list: List[np.ndarray], depth_scale: float) -> Li
     cb_mask = cv2.inRange(ycrcb_split[2], cb_range[0], cb_range[1])
     color_mask = cr_mask & cb_mask
     # Fill holes in color mask
-    color_mask = fill_hole(color_mask)
+    color_mask = _fill_hole(color_mask)
 
     # Combine two masks
     combined_mask = depth_mask & color_mask
@@ -74,7 +75,7 @@ def segment_one_frame(captured_list: List[np.ndarray], depth_scale: float) -> Li
     return [masked_depth, masked_gradient]
 
 
-def fill_hole(mask: np.ndarray) -> np.ndarray:
+def _fill_hole(mask: np.ndarray) -> np.ndarray:
     """
     File holes in the mask
     :param mask: mask to be filled
@@ -85,6 +86,49 @@ def fill_hole(mask: np.ndarray) -> np.ndarray:
     fill[1:shape[0] + 1, 1:shape[1] + 1] = mask.copy()
     cv2.floodFill(fill, np.zeros(shape + 4, np.uint8), (0, 0), 255)
     return mask | ~fill[1:shape[0] + 1, 1:shape[1] + 1]
+
+
+def normalize_sequence(seq: List[np.ndarray]) -> np.ndarray:
+    """
+    Normalize a gesture sequence to fit it into neural networks input.
+    :param seq: [depth_sequence, gradient_sequence]
+    :return: normalized sequence with shape [seq_len, image_height, image_width, num_channels]
+    """
+    # Resample two sequences to fixed length
+    depth_seq, gradient_seq = seq
+    depth_seq = _resample_sequence(depth_seq, sequence_length)
+    gradient_seq = _resample_sequence(gradient_seq, sequence_length)
+
+    # Convert two sequences to float values and normalize them
+    depth_norm: np.ndarray = depth_seq.astype(np.float32) * np.float32(1. / 255)
+    depth_norm = (depth_norm - depth_norm.mean()) / depth_norm.std()
+    gradient_norm: np.ndarray = gradient_seq.astype(np.float32) * np.float32(1. / 255)
+    gradient_norm = (gradient_norm - gradient_norm.mean()) / gradient_norm.std()
+
+    # Concatenate two channels of sequence depth-wise
+    shape = np.array(depth_norm.shape)
+    shape = np.append(shape, 1)
+    depth_norm = depth_norm.reshape(shape)
+    gradient_norm = gradient_norm.reshape(shape)
+    result = np.concatenate([depth_norm, gradient_norm], axis=3)
+    return result
+
+
+def _resample_sequence(seq: np.ndarray, target_len: int) -> np.ndarray:
+    """
+    Use temporal nearest neighbor interpolation to resample image sequence to target length
+    :param seq: source sequence to be processed
+    :param target_len: target length of resampling
+    :return: resampled sequence
+    """
+    shape = np.array(seq.shape)
+    shape[0] = target_len
+    result = np.ndarray(shape, dtype=seq.dtype)
+    scale = float(len(seq)) / target_len
+    for dst_idx in range(target_len):
+        src_idx = int(np.minimum(np.round(dst_idx * scale), seq.shape[0] - 1))
+        result[dst_idx] = seq[src_idx]
+    return result
 
 
 if __name__ == '__main__':
