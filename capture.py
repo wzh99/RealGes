@@ -1,3 +1,6 @@
+import os
+import threading
+import time
 from collections import deque
 from typing import List, Union
 
@@ -57,6 +60,48 @@ class Camera:
         return [depth_image, color_image]
 
 
+class StoreThread(threading.Thread):
+    """
+    Thread object that managed image sequence storage
+    """
+
+    def __init__(self, path: str, gesture_id: int, seq: List[np.ndarray]):
+        """
+        Constructor
+        :param path: where to store image sequence
+        :param seq: [depth_sequence, gradient_sequence]
+        """
+        assert seq is not None
+        super().__init__()
+        self.path = path
+        self.gesture = gesture_id
+        self.seq = seq
+
+    def run(self) -> None:
+        # Create gesture directory if not found
+        gesture_dir = "%s/%s" % (self.path, gesture.category_names[self.gesture])
+        if not os.path.exists(gesture_dir):
+            os.mkdir(gesture_dir)
+
+        # Create current sequence folder with local time
+        local_time = time.localtime(time.time())
+        time_str = time.strftime("%m%d%H%M%S", local_time)
+        seq_dir = "%s/%d" % (gesture_dir, int(time.time()))
+        os.mkdir(seq_dir)
+        print("storing to %s" % seq_dir)
+
+        # Store depth and gradient image, separately
+        depth_seq, gradient_seq = self.seq
+        for i in range(len(depth_seq)):
+            filename = "%s/d%02d.jpg" % (seq_dir, i)
+            print(filename)
+            cv2.imwrite(filename, depth_seq[i])
+        for i in range(len(gradient_seq)):
+            filename = "%s/g%02d.jpg" % (seq_dir, i)
+            print(filename)
+            cv2.imwrite(filename, gradient_seq[i])
+
+
 class Recorder:
     """
     A video recorder that can record frame sequences for dataset creation and realtime capturing.
@@ -103,8 +148,13 @@ class Recorder:
             if cv2.waitKey(1) == 32:
                 print("disabled" if enabled else "enabled")
                 enabled = not enabled
-            if enabled:
-                self._try_record_frame(seg_frame)
+            if not enabled:
+                continue
+            sequence = self._try_record_frame(seg_frame)
+            if sequence is None:
+                continue
+            thread = StoreThread(self.path, self.gesture, sequence)
+            thread.start()
 
         return None
 
@@ -146,7 +196,7 @@ class Recorder:
 
         return None
 
-    def _start_record(self):
+    def _start_record(self) -> None:
         """
         Start one round of recording
         :return:
@@ -173,7 +223,7 @@ class Recorder:
         print("valid")
         return True
 
-    def _display(self, frame: List[np.ndarray]):
+    def _display(self, frame: List[np.ndarray]) -> None:
         """
         Display a single frame of recorded result
         :param frame: [depth_image, gradient_image]
@@ -197,5 +247,5 @@ class Recorder:
 
 
 if __name__ == '__main__':
-    recorder = Recorder(Camera(), path="./data/")
+    recorder = Recorder(Camera(), path="data")
     recorder.record()
