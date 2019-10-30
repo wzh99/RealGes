@@ -1,8 +1,8 @@
 import os
-import threading
 import time
 from collections import deque
-from typing import List, Union
+from threading import Thread
+from typing import List, Optional, Callable
 
 import cv2
 import numpy as np
@@ -15,8 +15,8 @@ import preproc
 image_width = 640
 image_height = 480
 fps = 30
-start_diff_threshold = 10  # mean of test dequeue indicating when the recording should begin
-finish_diff_threshold = 10  # mean of test dequeue indicating when the recording should end
+start_diff_threshold = 10  # mean difference of test dequeue indicating beginning of record
+finish_diff_threshold = 10  # mean difference of test dequeue indicating end of record
 min_seq_length = 10
 test_deque_size = 4  # size of frames temporarily stored in test dequeue
 
@@ -60,7 +60,7 @@ class Camera:
         return [depth_image, color_image]
 
 
-class StoreThread(threading.Thread):
+class StoreThread(Thread):
     """
     Thread object that managed image sequence storage
     """
@@ -103,16 +103,21 @@ class Recorder:
     A video recorder that can record frame sequences for dataset creation and realtime capturing.
     """
 
-    def __init__(self, camera: Camera, path: str = "."):
+    def __init__(self, camera: Camera, path: str = None,
+                 callback: Callable[[List[np.ndarray]], None] = None):
         """
         Constructor
         :param camera: Camera object
         :param path: where to put dataset files
+        :param callback: callback function whenever a new valid sequence is recorded
         """
         # Set basic members
         self.gesture = 0  # which gesture to record
         self.camera = camera
-        self.path = path
+        if path is not None:
+            self.callback = lambda seq: StoreThread(path, self.gesture, seq).start()
+        else:  # path not provided, take custom callback
+            self.callback = callback
         self.is_recording = False
 
         # Create recorder GUI
@@ -129,10 +134,9 @@ class Recorder:
         self.frame_test_deque = deque(maxlen=test_deque_size)  # store history frames
         self.diff_test_deque = deque(maxlen=test_deque_size)  # store history mean values
 
-    def record(self) -> Union[np.ndarray, None]:
+    def record(self) -> None:
         """
-        Record a video sequence as train dataset and store it into directory.
-        :return: numpy array if recording real time test data, or None if creating dataset.
+        Record a video sequence as train or predict dataset.
         """
         enabled = False  # ready to detect new sequence or not
         while cv2.waitKey(1) != 27:
@@ -149,16 +153,13 @@ class Recorder:
             sequence = self._try_record_frame(seg_frame)
             if sequence is None:
                 continue
-            thread = StoreThread(self.path, self.gesture, sequence)
-            thread.start()
+            self.callback(sequence)  # run callback since a new valid sequence is found
 
-        return None
-
-    def _try_record_frame(self, frame: List[np.ndarray]) -> Union[List[np.ndarray], None]:
+    def _try_record_frame(self, frame: List[np.ndarray]) -> Optional[List[np.ndarray]]:
         """
         Use mean of mask difference to test whether to start or end recording.
         :param frame: a single frame to be recorded
-        :return: None
+        :return: [depth_sequence, gradient_sequence] if a valid sequence is found
         """
         # Get two images in a frame
         depth_image, gradient_image = frame
@@ -198,7 +199,7 @@ class Recorder:
         :return:
         """
         self.is_recording = True
-        # print("Start recording")
+        # print("start recording")
         self.depth_store_list = [frame[0] for frame in self.frame_test_deque]
         self.gradient_store_list = [frame[1] for frame in self.frame_test_deque]
 
@@ -208,7 +209,7 @@ class Recorder:
         :return: [depth_sequence, gradient_sequence]
         """
         self.is_recording = False
-        # print("Finish recording")
+        # print("finish recording")
         return [np.array(self.depth_store_list), np.array(self.gradient_store_list)]
 
     @staticmethod
@@ -216,7 +217,7 @@ class Recorder:
         print("length:", seq[0].shape[0])
         if seq[0].shape[0] < min_seq_length:
             return False
-        print("valid")
+        # print("valid")
         return True
 
     def _display(self, frame: List[np.ndarray]) -> None:

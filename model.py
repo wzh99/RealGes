@@ -4,7 +4,10 @@ from keras.models import Sequential
 
 import gesture
 import load
-import preproc
+
+input_length = 16
+input_width = 120
+input_height = 90
 
 
 class CNN3D(Sequential):
@@ -18,7 +21,7 @@ class CNN3D(Sequential):
 
         # Main model specification
         # Convolutional layers
-        input_shape = [preproc.sequence_length, load.resize_height, load.resize_width, 2]
+        input_shape = [input_length, input_height, input_width, 2]
         self.add(Conv3D(4, (5, 7, 7), input_shape=input_shape, data_format="channels_last"))
         self.add(MaxPooling3D())
         self.add(Activation("relu"))
@@ -48,11 +51,13 @@ class CNN3D(Sequential):
         self.add(Dense(len(gesture.category_names)))
         self.add(Activation("softmax"))
 
+        # Compile models in constructor, since its compiling configuration is fixed
+        opt = keras.optimizers.SGD(learning_rate=0.005, momentum=0.9, nesterov=True)
+        self.compile(opt, loss="categorical_crossentropy", metrics=["accuracy"])
+
 
 if __name__ == '__main__':
     model = CNN3D()
-    opt = keras.optimizers.SGD(learning_rate=0.005, momentum=0.9, nesterov=True)
-    model.compile(opt, loss="categorical_crossentropy", metrics=["accuracy"])
     data_x, data_y = load.load_dataset("data")
     data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
     model.fit(x=data_x, y=data_y, batch_size=20, epochs=30)

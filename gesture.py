@@ -7,6 +7,6 @@ category_names = [
     "rotate_ccw",
     "pinch",
     "expand",
-    "yes",
+    "ok",
     "no",
 ]

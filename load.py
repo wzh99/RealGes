@@ -4,11 +4,8 @@ import cv2
 import numpy as np
 
 import gesture
+import model
 import preproc
-
-# Load
-resize_width = 120
-resize_height = 90
 
 
 def load_dataset(path: str):
@@ -19,7 +16,8 @@ def load_dataset(path: str):
         data_x.shape = [num_sequences, sequence_len, image_height, image_width, num_channels]
         data_y.shape = [num_sequences]
     """
-    data_x = np.ndarray([0, preproc.sequence_length, resize_height, resize_width, 2], dtype=np.float32)
+    data_x = np.ndarray([0, model.input_length, model.input_height, model.input_width, 2],
+                        dtype=np.float32)
     data_y = np.ndarray([0], dtype=np.int)
 
     for gesture_id in range(len(gesture.category_names)):
@@ -51,7 +49,7 @@ def load_one_sequence(path: str) -> np.ndarray:
         if not os.path.exists(depth_file):
             break
         depth_image = cv2.imread(depth_file, flags=cv2.IMREAD_UNCHANGED)
-        depth_image = cv2.resize(depth_image, (resize_width, resize_height))
+        depth_image = cv2.resize(depth_image, (model.input_width, model.input_height))
         depth_seq.append(depth_image)
         seq_len += 1
 
@@ -60,7 +58,7 @@ def load_one_sequence(path: str) -> np.ndarray:
     for i in range(seq_len):
         gradient_file = os.path.join(path, "g%02d.jpg" % i)
         gradient_image = cv2.imread(gradient_file, flags=cv2.IMREAD_UNCHANGED)
-        gradient_image = cv2.resize(gradient_image, (resize_width, resize_height))
+        gradient_image = cv2.resize(gradient_image, (model.input_width, model.input_height))
         gradient_seq.append(gradient_image)
 
     # Normalize gesture sequence

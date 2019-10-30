@@ -3,6 +3,8 @@ from typing import List
 import cv2
 import numpy as np
 
+import model
+
 # Preprocess
 depth_thresh = 0.4  # in meters
 median_size = 7  # median filter kernel size
@@ -10,7 +12,6 @@ dilation_size = 5  # dilation kernel size
 cr_range = (133, 173)  # Cr component range
 cb_range = (77, 127)  # Cb component range
 min_contour_area = 10000  # minimum acceptable hand contour area
-sequence_length = 16  # target length of processed sequence
 
 
 def segment_one_frame(captured_list: List[np.ndarray], depth_scale: float) -> List[np.ndarray]:
@@ -96,8 +97,8 @@ def normalize_sequence(seq: List[np.ndarray]) -> np.ndarray:
     """
     # Resample two sequences to fixed length
     depth_seq, gradient_seq = seq
-    depth_seq = _resample_sequence(depth_seq, sequence_length)
-    gradient_seq = _resample_sequence(gradient_seq, sequence_length)
+    depth_seq = _resample_sequence(depth_seq, model.input_length)
+    gradient_seq = _resample_sequence(gradient_seq, model.input_length)
 
     # Convert two sequences to float values and normalize them
     depth_norm: np.ndarray = depth_seq.astype(np.float32) * np.float32(1. / 255)
