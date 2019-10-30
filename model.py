@@ -1,5 +1,5 @@
 import keras
-from keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Activation
+from keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Activation, Dropout
 from keras.models import Sequential
 
 import gesture
@@ -39,9 +39,11 @@ class CNN3D(Sequential):
         self.add(Flatten())
         self.add(Dense(512))
         self.add(Activation("relu"))
+        self.add(Dropout(0.5))
 
         self.add(Dense(256))
         self.add(Activation("relu"))
+        self.add(Dropout(0.5))
 
         self.add(Dense(len(gesture.category_names)))
         self.add(Activation("softmax"))
@@ -53,4 +55,5 @@ if __name__ == '__main__':
     model.compile(opt, loss="categorical_crossentropy", metrics=["accuracy"])
     data_x, data_y = load.load_dataset("data")
     data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
-    model.fit(x=data_x, y=data_y, epochs=30)
+    model.fit(x=data_x, y=data_y, batch_size=20, epochs=30)
+    model.save_weights("cnn3d.h5")

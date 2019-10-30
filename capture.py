@@ -92,11 +92,9 @@ class StoreThread(threading.Thread):
         depth_seq, gradient_seq = self.seq
         for i in range(len(depth_seq)):
             filename = os.path.join(seq_dir, "d%02d.jpg" % i)
-            print(filename)
             cv2.imwrite(filename, depth_seq[i])
         for i in range(len(gradient_seq)):
             filename = os.path.join(seq_dir, "g%02d.jpg" % i)
-            print(filename)
             cv2.imwrite(filename, gradient_seq[i])
 
 
