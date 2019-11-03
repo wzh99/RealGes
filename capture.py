@@ -103,21 +103,22 @@ class Recorder:
     A video recorder that can record frame sequences for dataset creation and realtime capturing.
     """
 
-    def __init__(self, camera: Camera, path: str = None,
-                 callback: Callable[[List[np.ndarray]], None] = None):
+    def __init__(self, path: str = None,
+                 callback: Callable[[List[np.ndarray]], None] = lambda seq: ()):
         """
         Constructor
-        :param camera: Camera object
         :param path: where to put dataset files
         :param callback: callback function whenever a new valid sequence is recorded
         """
         # Set basic members
         self.gesture = 0  # which gesture to record
-        self.camera = camera
+        self.camera = Camera()
         if path is not None:
             self.callback = lambda seq: StoreThread(path, self.gesture, seq).start()
+            self.train_data = True
         else:  # path not provided, take custom callback
             self.callback = callback
+            self.train_data = False
         self.is_recording = False
 
         # Create recorder GUI
@@ -127,8 +128,9 @@ class Recorder:
         def on_track_bar(x: int):
             self.gesture = x
 
-        cv2.createTrackbar("Gesture", self.window_name, self.gesture, len(gesture.category_names) - 1,
-                           on_track_bar)
+        if self.train_data:
+            cv2.createTrackbar("Gesture", self.window_name, self.gesture,
+                               len(gesture.category_names) - 1, on_track_bar)
 
         # Initialize frame buffer
         self.frame_test_deque = deque(maxlen=test_deque_size)  # store history frames
@@ -186,7 +188,7 @@ class Recorder:
         if self.is_recording:
             if mean < finish_diff_threshold:
                 sequence = self._finish_record()
-                return sequence if self._check_sequence(sequence) else None
+                return sequence if self._validate_sequence(sequence) else None
             else:
                 self.depth_store_list.append(depth_image)
                 self.gradient_store_list.append(gradient_image)
@@ -213,7 +215,7 @@ class Recorder:
         return [np.array(self.depth_store_list), np.array(self.gradient_store_list)]
 
     @staticmethod
-    def _check_sequence(seq: List[np.ndarray]) -> bool:
+    def _validate_sequence(seq: List[np.ndarray]) -> bool:
         print("length:", seq[0].shape[0])
         if seq[0].shape[0] < min_seq_length:
             return False
@@ -238,11 +240,13 @@ class Recorder:
         cv2.circle(stacked, (int(scaled_width * 1.5), int(scaled_height * .5)), 2, 255, thickness=-1)
 
         # Put gesture category text
-        cv2.putText(stacked, gesture.category_names[self.gesture], (0, scaled_height),
-                    cv2.FONT_HERSHEY_PLAIN, 1, 255)
+        if self.train_data:
+            cv2.putText(stacked, gesture.category_names[self.gesture], (0, scaled_height),
+                        cv2.FONT_HERSHEY_PLAIN, 1, 255)
         cv2.imshow(self.window_name, stacked)
 
 
 if __name__ == '__main__':
-    recorder = Recorder(Camera(), path="data")
-    recorder.record()
+    rec = Recorder(path="data")
+    # rec = Recorder()
+    rec.record()

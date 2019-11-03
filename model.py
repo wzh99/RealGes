@@ -1,3 +1,5 @@
+import os
+
 import keras
 from keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Activation, Dropout
 from keras.models import Sequential
@@ -8,6 +10,7 @@ import load
 input_length = 16
 input_width = 120
 input_height = 90
+weights_path = "cnn3d.h5"
 
 
 class CNN3D(Sequential):
@@ -60,5 +63,8 @@ if __name__ == '__main__':
     model = CNN3D()
     data_x, data_y = load.load_dataset("data")
     data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
+    if os.path.exists(weights_path):
+        print("Weight file is found, fine-tune on existing weights.")
+        model.load_weights(weights_path)
     model.fit(x=data_x, y=data_y, batch_size=20, epochs=30)
-    model.save_weights("cnn3d.h5")
+    model.save_weights(weights_path)

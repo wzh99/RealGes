@@ -1,3 +1,4 @@
+import os
 from threading import Thread
 from typing import List
 
@@ -8,7 +9,7 @@ import numpy as np
 import gesture
 import model
 import preproc
-from capture import Recorder, Camera
+from capture import Recorder
 
 
 class Recognizer(Thread):
@@ -46,7 +47,9 @@ class Recognizer(Thread):
 
 
 if __name__ == '__main__':
-    cnn = model.CNN3D()
-    cnn.load_weights("cnn3d.h5")
-    rec = Recorder(Camera(), callback=lambda seq: Recognizer(cnn, seq).run())
+    nn = model.CNN3D()
+    if not os.path.exists(model.weights_path):
+        raise RuntimeError("Weight file not found. Cannot run gesture recognition program.")
+    nn.load_weights(model.weights_path)
+    rec = Recorder(callback=lambda seq: Recognizer(nn, seq).run())
     rec.record()
