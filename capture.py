@@ -150,6 +150,10 @@ class Recorder:
             if cv2.waitKey(1) == 32:
                 print("disabled" if enabled else "enabled")
                 enabled = not enabled
+                if not enabled:
+                    self.is_recording = False
+                    self._clear()
+
             if not enabled:
                 continue
             sequence = self._try_record_frame(seg_frame)
@@ -244,6 +248,16 @@ class Recorder:
             cv2.putText(stacked, gesture.category_names[self.gesture], (0, scaled_height),
                         cv2.FONT_HERSHEY_PLAIN, 1, 255)
         cv2.imshow(self.window_name, stacked)
+
+    def _clear(self) -> None:
+        """
+        Clear all data in buffers.
+        :return: None
+        """
+        self.frame_test_deque.clear()
+        self.diff_test_deque.clear()
+        self.depth_store_list.clear()
+        self.gradient_store_list.clear()
 
 
 if __name__ == '__main__':

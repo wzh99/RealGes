@@ -3,8 +3,6 @@ from typing import List
 import cv2
 import numpy as np
 
-import model
-
 # Preprocess
 depth_thresh = 0.4  # in meters
 median_size = 7  # median filter kernel size
@@ -89,33 +87,7 @@ def _fill_hole(mask: np.ndarray) -> np.ndarray:
     return mask | ~fill[1:shape[0] + 1, 1:shape[1] + 1]
 
 
-def normalize_sequence(seq: List[np.ndarray]) -> np.ndarray:
-    """
-    Normalize a gesture sequence to fit it into neural networks input.
-    :param seq: [depth_sequence, gradient_sequence]
-    :return: normalized sequence with shape [seq_len, image_height, image_width, num_channels]
-    """
-    # Resample two sequences to fixed length
-    depth_seq, gradient_seq = seq
-    depth_seq = _resample_sequence(depth_seq, model.input_length)
-    gradient_seq = _resample_sequence(gradient_seq, model.input_length)
-
-    # Convert two sequences to float values and normalize them
-    depth_norm: np.ndarray = depth_seq.astype(np.float32) * np.float32(1. / 255)
-    depth_norm = (depth_norm - depth_norm.mean()) / depth_norm.std()
-    gradient_norm: np.ndarray = gradient_seq.astype(np.float32) * np.float32(1. / 255)
-    gradient_norm = (gradient_norm - gradient_norm.mean()) / gradient_norm.std()
-
-    # Concatenate two channels of sequence depth-wise
-    shape = np.array(depth_norm.shape)
-    shape = np.append(shape, 1)
-    depth_norm = depth_norm.reshape(shape)
-    gradient_norm = gradient_norm.reshape(shape)
-    result = np.concatenate([depth_norm, gradient_norm], axis=3)
-    return result
-
-
-def _resample_sequence(seq: np.ndarray, target_len: int) -> np.ndarray:
+def temporal_resample(seq: np.ndarray, target_len: int) -> np.ndarray:
     """
     Use temporal nearest neighbor interpolation to resample image sequence to target length
     :param seq: source sequence to be processed
@@ -132,9 +104,26 @@ def _resample_sequence(seq: np.ndarray, target_len: int) -> np.ndarray:
     return result
 
 
-if __name__ == '__main__':
-    from capture import Camera
-    camera = Camera()
-    while cv2.waitKey(1) != 27:
-        segmented = segment_one_frame(camera.capture(), camera.depth_scale)
-        cv2.imshow("Result", np.hstack(segmented))
+def normalize_sample(sample: np.ndarray) -> np.ndarray:
+    """
+    Normalize a gesture sequence to fit it into neural networks input.
+    :param sample: channel-first gesture sequence
+        shape: [num_channels, seq_len, img_height, img_width]
+        dtype: numpy.uint8
+    :return: normalized channel-last gesture sequence
+        shape: [seq_len, img_height, img_width, num_channels]
+        dtype: numpy.float32
+    """
+    # Convert to float data type and apply normalization for each channel respectively
+    result = np.ndarray(sample.shape, dtype=np.float32)
+    for channel_idx in range(2):
+        float_data = sample[channel_idx].astype(np.float32) * np.float32(1. / 255)
+        result[channel_idx] = (float_data - float_data.mean()) / float_data.std()
+
+    # Concatenate two channels of sequence depth-wise
+    shape = np.append(sample[0].shape, 1)
+    depth_seq = result[0].reshape(shape)
+    grad_seq = result[1].reshape(shape)
+    result = np.concatenate([depth_seq, grad_seq], axis=3)
+
+    return result
