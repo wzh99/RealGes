@@ -4,7 +4,7 @@ from keras.models import Sequential
 
 import gesture
 
-input_length = 16
+input_length = 32
 input_width = 120
 input_height = 90
 
@@ -22,19 +22,19 @@ class CNN3D(Sequential):
         # Convolutional layers
         input_shape = [input_length, input_height, input_width, 2]
         self.add(Conv3D(4, (5, 7, 7), input_shape=input_shape, data_format="channels_last"))
-        self.add(MaxPooling3D())
+        self.add(MaxPooling3D(pool_size=(1, 2, 2)))
         self.add(Activation("relu"))
 
         self.add(Conv3D(8, (3, 5, 5)))
-        self.add(MaxPooling3D(pool_size=(1, 2, 2)))
+        self.add(MaxPooling3D())
         self.add(Activation("relu"))
 
         self.add(Conv3D(32, (3, 5, 5)))
-        self.add(MaxPooling3D(pool_size=(1, 2, 2)))
+        self.add(MaxPooling3D())
         self.add(Activation("relu"))
 
-        self.add(Conv3D(64, (1, 3, 5)))
-        self.add(MaxPooling3D(pool_size=(1, 2, 2)))
+        self.add(Conv3D(64, (3, 3, 5)))
+        self.add(MaxPooling3D())
         self.add(Activation("relu"))
 
         # Fully-connected layers

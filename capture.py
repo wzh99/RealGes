@@ -15,10 +15,10 @@ import preproc
 image_width = 640
 image_height = 480
 fps = 30
-start_diff_threshold = 10  # mean difference of test dequeue indicating beginning of record
-finish_diff_threshold = 10  # mean difference of test dequeue indicating end of record
-min_seq_length = 10
-test_deque_size = 4  # size of frames temporarily stored in test dequeue
+start_depth_diff = 4.5  # mean difference of test dequeue indicating beginning of record
+finish_depth_diff = 4  # mean difference of test dequeue indicating end of record
+min_seq_length = 15
+test_deque_size = 5  # size of frames temporarily stored in test dequeue
 
 
 class Camera:
@@ -133,8 +133,9 @@ class Recorder:
                                len(gesture.category_names) - 1, on_track_bar)
 
         # Initialize frame buffer
-        self.frame_test_deque = deque(maxlen=test_deque_size)  # store history frames
-        self.diff_test_deque = deque(maxlen=test_deque_size)  # store history mean values
+        self.frame_detect = deque(maxlen=test_deque_size)  # store history frames
+        self.depth_diff = deque(maxlen=test_deque_size)  # store history difference values
+        self.grad_diff = deque(maxlen=test_deque_size)
 
     def record(self) -> None:
         """
@@ -168,34 +169,39 @@ class Recorder:
         :return: [depth_sequence, gradient_sequence] if a valid sequence is found
         """
         # Get two images in a frame
-        depth_image, gradient_image = frame
+        depth_img, grad_img = frame
 
         # Pop elements if deque is already full
-        if len(self.frame_test_deque) >= test_deque_size:
-            self.frame_test_deque.popleft()
-            self.diff_test_deque.popleft()
+        if len(self.frame_detect) >= test_deque_size:
+            self.frame_detect.popleft()
+            self.depth_diff.popleft()
+            self.grad_diff.popleft()
 
         # Push current depth image to deque
-        this_diff = 0
-        if len(self.frame_test_deque) > 0:
-            last_depth_image = self.frame_test_deque[-1][0]  # get last depth image
-            diff_image = depth_image - last_depth_image
-            this_diff = cv2.mean(cv2.inRange(diff_image, 10, 255))[0]
-            # print(this_diff)
-        self.frame_test_deque.append(frame)
-        self.diff_test_deque.append(this_diff)
+        depth_diff, grad_diff = 0, 0
+        if len(self.frame_detect) > 0:
+            last_depth = self.frame_detect[-1][0]  # get last depth image
+            depth_diff = np.mean(np.abs(depth_img - last_depth))
+            last_grad = self.frame_detect[-1][1]
+            grad_diff = np.mean(np.abs(grad_img - last_grad))
+        self.frame_detect.append(frame)
+        self.depth_diff.append(depth_diff)
+        self.grad_diff.append(grad_diff)
 
         # Compute average difference in recent frames
-        mean = np.mean(self.diff_test_deque)
-        if mean > start_diff_threshold and not self.is_recording:
+        depth_diff_mean = np.mean(self.depth_diff)
+        # print(depth_diff_mean)
+        can_start = depth_diff_mean > start_depth_diff
+        if can_start and not self.is_recording:
             self._start_record()
         if self.is_recording:
-            if mean < finish_diff_threshold:
+            should_finish = depth_diff_mean < finish_depth_diff
+            if should_finish:
                 sequence = self._finish_record()
                 return sequence if self._validate_sequence(sequence) else None
             else:
-                self.depth_store_list.append(depth_image)
-                self.gradient_store_list.append(gradient_image)
+                self.depth_store_list.append(depth_img)
+                self.gradient_store_list.append(grad_img)
 
         return None
 
@@ -206,8 +212,8 @@ class Recorder:
         """
         self.is_recording = True
         # print("start recording")
-        self.depth_store_list = [frame[0] for frame in self.frame_test_deque]
-        self.gradient_store_list = [frame[1] for frame in self.frame_test_deque]
+        self.depth_store_list = [frame[0] for frame in self.frame_detect]
+        self.gradient_store_list = [frame[1] for frame in self.frame_detect]
 
     def _finish_record(self) -> List[np.ndarray]:
         """
@@ -254,8 +260,8 @@ class Recorder:
         Clear all data in buffers.
         :return: None
         """
-        self.frame_test_deque.clear()
-        self.diff_test_deque.clear()
+        self.frame_detect.clear()
+        self.depth_diff.clear()
         self.depth_store_list.clear()
         self.gradient_store_list.clear()
 

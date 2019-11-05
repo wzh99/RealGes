@@ -12,7 +12,7 @@ import model
 import preproc
 
 weights_path = "cnn3d.h5"
-epochs = 10
+epochs = 30
 
 
 class Augmentor(Thread):
@@ -81,11 +81,11 @@ class Augmentor(Thread):
 
 
 if __name__ == '__main__':
+    nn = model.CNN3D()
     data_x, data_y = load.load_dataset("data")
     data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
     aug = Augmentor(data_x)
     aug.start()
-    nn = model.CNN3D()
     if os.path.exists(weights_path):
         print("Weight file is found, fine-tune on existing weights.")
         nn.load_weights(weights_path)
