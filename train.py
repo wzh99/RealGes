@@ -12,7 +12,7 @@ import model
 import preproc
 
 weights_path = "cnn3d.h5"
-epochs = 30
+epochs = 10
 
 
 class Augmentor(Thread):

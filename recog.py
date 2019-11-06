@@ -22,7 +22,7 @@ class Recognizer(Thread):
         """
         Constructor
         :param mdl: a Keras model used to recognize recorded gesture
-        :param sample: [depth_seq, grad_seq]
+        :param sample: [depth_chan, grad_chan]
         """
         super().__init__()
         self.model = mdl

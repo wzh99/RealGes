@@ -14,7 +14,7 @@ import preproc
 # Capture
 image_width = 640
 image_height = 480
-fps = 30
+record_fps = 16
 start_depth_diff = 4.5  # mean difference of test dequeue indicating beginning of record
 finish_depth_diff = 4  # mean difference of test dequeue indicating end of record
 min_seq_length = 15
@@ -29,8 +29,8 @@ class Camera:
     def __init__(self):
         self.pipeline = rs.pipeline()
         config = rs.config()
-        config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, fps)
-        config.enable_stream(rs.stream.color, image_width, image_height, rs.format.bgr8, fps)
+        config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, 30)
+        config.enable_stream(rs.stream.color, image_width, image_height, rs.format.bgr8, 30)
         profile = self.pipeline.start(config)
         # Get depth sensor's scale
         depth_sensor = profile.get_device().first_depth_sensor()
@@ -60,44 +60,6 @@ class Camera:
         return [depth_image, color_image]
 
 
-class StoreThread(Thread):
-    """
-    Thread object that managed image sequence storage
-    """
-
-    def __init__(self, path: str, gesture_id: int, seq: List[np.ndarray]):
-        """
-        Constructor
-        :param path: where to store image sequence
-        :param seq: [depth_sequence, gradient_sequence]
-        """
-        assert seq is not None
-        super().__init__()
-        self.path = path
-        self.gesture = gesture_id
-        self.seq = seq
-
-    def run(self) -> None:
-        # Create gesture directory if not found
-        gesture_dir = os.path.join(self.path, gesture.category_names[self.gesture])
-        if not os.path.exists(gesture_dir):
-            os.mkdir(gesture_dir)
-
-        # Create current sequence folder with local time
-        seq_dir = os.path.join(gesture_dir, "%d" % int(time.time()))
-        os.mkdir(seq_dir)
-        print("storing to %s" % seq_dir)
-
-        # Store depth and gradient image, separately
-        depth_seq, gradient_seq = self.seq
-        for i in range(len(depth_seq)):
-            filename = os.path.join(seq_dir, "d%02d.jpg" % i)
-            cv2.imwrite(filename, depth_seq[i])
-        for i in range(len(gradient_seq)):
-            filename = os.path.join(seq_dir, "g%02d.jpg" % i)
-            cv2.imwrite(filename, gradient_seq[i])
-
-
 class Recorder:
     """
     A video recorder that can record frame sequences for dataset creation and realtime capturing.
@@ -113,7 +75,7 @@ class Recorder:
         # Set basic members
         self.gesture = 0  # which gesture to record
         self.camera = Camera()
-        if path is not None:
+        if path:
             self.callback = lambda seq: StoreThread(path, self.gesture, seq).start()
             self.train_data = True
         else:  # path not provided, take custom callback
@@ -135,28 +97,40 @@ class Recorder:
         # Initialize frame buffer
         self.frame_detect = deque(maxlen=test_deque_size)  # store history frames
         self.depth_diff = deque(maxlen=test_deque_size)  # store history difference values
-        self.grad_diff = deque(maxlen=test_deque_size)
 
     def record(self) -> None:
         """
         Record a video sequence as train or predict dataset.
         """
         enabled = False  # ready to detect new sequence or not
+        delay = Delay(1. / record_fps)
+        delay.start()
         while cv2.waitKey(1) != 27:
+            # Frame delay
+            delay.join()
+            delay = Delay(1. / record_fps)
+            delay.start()
+
+            # Capture frame from camera
             captured_frame = self.camera.capture()
             if len(captured_frame) == 0:
                 continue
+
+            # Preprocess one frame and display it on window
             seg_frame = preproc.segment_one_frame(captured_frame, self.camera.depth_scale)
             self._display(seg_frame)
+
+            # Switch recording state if possible
             if cv2.waitKey(1) == 32:
                 print("disabled" if enabled else "enabled")
                 enabled = not enabled
                 if not enabled:
                     self.is_recording = False
                     self._clear()
-
             if not enabled:
                 continue
+
+            # Try to record a frame
             sequence = self._try_record_frame(seg_frame)
             if sequence is None:
                 continue
@@ -175,7 +149,6 @@ class Recorder:
         if len(self.frame_detect) >= test_deque_size:
             self.frame_detect.popleft()
             self.depth_diff.popleft()
-            self.grad_diff.popleft()
 
         # Push current depth image to deque
         depth_diff, grad_diff = 0, 0
@@ -186,7 +159,6 @@ class Recorder:
             grad_diff = np.mean(np.abs(grad_img - last_grad))
         self.frame_detect.append(frame)
         self.depth_diff.append(depth_diff)
-        self.grad_diff.append(grad_diff)
 
         # Compute average difference in recent frames
         depth_diff_mean = np.mean(self.depth_diff)
@@ -208,7 +180,7 @@ class Recorder:
     def _start_record(self) -> None:
         """
         Start one round of recording
-        :return:
+        :return: None
         """
         self.is_recording = True
         # print("start recording")
@@ -246,8 +218,10 @@ class Recorder:
 
         # Draw dividing lines and center circles
         cv2.line(stacked, (scaled_width, 0), (scaled_width, scaled_height), 255)
-        cv2.circle(stacked, (int(scaled_width * .5), int(scaled_height * .5)), 2, 255, thickness=-1)
-        cv2.circle(stacked, (int(scaled_width * 1.5), int(scaled_height * .5)), 2, 255, thickness=-1)
+        cv2.circle(stacked, (int(scaled_width * .5), int(scaled_height * .5)), 2, 255,
+                   thickness=-1)
+        cv2.circle(stacked, (int(scaled_width * 1.5), int(scaled_height * .5)), 2, 255,
+                   thickness=-1)
 
         # Put gesture category text
         if self.train_data:
@@ -264,6 +238,61 @@ class Recorder:
         self.depth_diff.clear()
         self.depth_store_list.clear()
         self.gradient_store_list.clear()
+
+
+class StoreThread(Thread):
+    """
+    Thread object that managed image sequence storage
+    """
+
+    def __init__(self, path: str, gesture_id: int, seq: List[np.ndarray]):
+        """
+        Constructor
+        :param path: where to store image sequence
+        :param seq: [depth_sequence, gradient_sequence]
+        """
+        assert seq
+        super().__init__()
+        self.path = path
+        self.gesture = gesture_id
+        self.seq = seq
+
+    def run(self) -> None:
+        # Create gesture directory if not found
+        gesture_dir = os.path.join(self.path, gesture.category_names[self.gesture])
+        if not os.path.exists(gesture_dir):
+            os.mkdir(gesture_dir)
+
+        # Create current sequence folder with local time
+        seq_dir = os.path.join(gesture_dir, "%d" % int(time.time()))
+        os.mkdir(seq_dir)
+        print("storing to %s" % seq_dir)
+
+        # Store depth and gradient image, separately
+        depth_seq, gradient_seq = self.seq
+        for i in range(len(depth_seq)):
+            filename = os.path.join(seq_dir, "d%02d.jpg" % i)
+            cv2.imwrite(filename, depth_seq[i])
+        for i in range(len(gradient_seq)):
+            filename = os.path.join(seq_dir, "g%02d.jpg" % i)
+            cv2.imwrite(filename, gradient_seq[i])
+
+
+class Delay(Thread):
+    """
+    Delay a fixed length of time.
+    """
+
+    def __init__(self, len: float):
+        """
+        Constructor
+        :param len: time to be delayed, in seconds
+        """
+        super().__init__()
+        self.len = len
+
+    def run(self) -> None:
+        time.sleep(self.len)
 
 
 if __name__ == '__main__':
