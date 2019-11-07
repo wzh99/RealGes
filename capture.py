@@ -15,9 +15,9 @@ import preproc
 image_width = 640
 image_height = 480
 record_fps = 16
-start_depth_diff = 4.5  # mean difference of test dequeue indicating beginning of record
-finish_depth_diff = 4  # mean difference of test dequeue indicating end of record
-min_seq_length = 15
+start_depth_diff = 5  # mean difference of test dequeue indicating beginning of record
+finish_depth_diff = 4.5  # mean difference of test dequeue indicating end of record
+min_seq_length = 14
 test_deque_size = 5  # size of frames temporarily stored in test dequeue
 
 

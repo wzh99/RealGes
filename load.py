@@ -1,18 +1,20 @@
 import os
+from typing import Tuple
 
 import cv2
 import numpy as np
+import h5py
 
 import gesture
 import model
 import preproc
 
 
-def load_dataset(path: str):
+def from_directory(path: str) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Load the whole dataset from file and assemble as channel first training data.
+    Load the whole dataset from directory and assemble as channel first training data.
     :param path: where to load dataset
-    :return: tuple (data_x, data_y)
+    :return: (data_x, data_y)
         data_x.shape: [num_samples, num_channels, seq_len, image_height, image_width]
         data_x.dtype: numpy.uint8
         data_y.shape: [num_samples]
@@ -28,7 +30,7 @@ def load_dataset(path: str):
             continue
         for seq_name in os.listdir(gesture_dir):
             seq_dir = os.path.join(gesture_dir, seq_name)
-            seq = load_one_sequence(seq_dir)
+            seq = _load_one_sequence(seq_dir)
             data_x = np.append(data_x, [seq], axis=0)
             data_y = np.append(data_y, gesture_id)
 
@@ -36,7 +38,7 @@ def load_dataset(path: str):
     return data_x, data_y
 
 
-def load_one_sequence(path: str) -> np.ndarray:
+def _load_one_sequence(path: str) -> np.ndarray:
     """
     Load one gesture sequence from file and normalize it.
     :param path: where to load a single sequence
@@ -66,9 +68,36 @@ def load_one_sequence(path: str) -> np.ndarray:
         grad_seq.append(grad_img)
     grad_seq = preproc.temporal_resample(np.array(grad_seq), model.input_length)
 
-    # Normalize gesture sequence
     return np.array([depth_seq, grad_seq])
 
 
+def _store_as_hdf5(path: str, data_x: np.ndarray, data_y: np.ndarray) -> None:
+    """
+    Store dataset as an HDF5 file
+    :param data_x: gesture sample array
+        shape: [num_samples, num_channels, seq_len, image_height, image_width]
+        dtype: numpy.uint8
+    :param data_y: gesture index label (not categorical)
+        shape: [num_samples]
+        dtype: numpy.int
+    :return: None
+    """
+    file = h5py.File(path, "a")
+    file.create_dataset("data_x", data=data_x)
+    file.create_dataset("data_y", data=data_y)
+    file.close()
+
+
+def from_hdf5(path: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Load dataset from hdf5 file.
+    :param path: where HDF5 file is stored
+    :return: the same as from_directory
+    """
+    file = h5py.File(path, "r")
+    return file["data_x"], file["data_y"]
+
+
 if __name__ == '__main__':
-    load_dataset("data")
+    x, y = from_directory("data")
+    _store_as_hdf5("dataset.h5", x, y)

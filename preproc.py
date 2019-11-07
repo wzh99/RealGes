@@ -90,9 +90,11 @@ def _fill_hole(mask: np.ndarray) -> np.ndarray:
 def temporal_resample(seq: np.ndarray, target_len: int) -> np.ndarray:
     """
     Use temporal nearest neighbor interpolation to resample image sequence to target length
-    :param seq: source sequence to be processed
+    :param seq: single channel sequence to be processed
+        shape: [src_len, img_height, img_width]
     :param target_len: target length of resampling
     :return: resampled sequence
+        shape: [target_len, img_height, img_width]
     """
     shape = np.array(seq.shape)
     shape[0] = target_len
