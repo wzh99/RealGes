@@ -156,7 +156,6 @@ class Recorder:
             last_depth = self.frame_detect[-1][0]  # get last depth image
             depth_diff = np.mean(np.abs(depth_img - last_depth))
             last_grad = self.frame_detect[-1][1]
-            grad_diff = np.mean(np.abs(grad_img - last_grad))
         self.frame_detect.append(frame)
         self.depth_diff.append(depth_diff)
 
@@ -286,7 +285,7 @@ class Delay(Thread):
     def __init__(self, delay_len: float):
         """
         Constructor
-        :param len: time to be delayed, in seconds
+        :param delay_len: time to be delayed, in seconds
         """
         super().__init__()
         self.len = delay_len

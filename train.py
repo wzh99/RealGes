@@ -139,7 +139,7 @@ class ExitListener(Thread):
 
 if __name__ == '__main__':
     # Build network model
-    spec = model.network_spec["hrn"]
+    spec = model.network_spec["lrn"]
     nn = spec["init"]()
 
     # Load dataset from file and initialize data augmentation
@@ -157,6 +157,10 @@ if __name__ == '__main__':
     listener = ExitListener()
     listener.start()
 
+    # Set model checkpoint callback
+    checkpoint = keras.callbacks.ModelCheckpoint(spec["path"], monitor="loss", verbose=1,
+                                                 save_best_only=True, save_weights_only=True)
+
     # Training loop
     epoch_idx = 0
     while not listener.exit and epoch_idx < num_epochs:
@@ -165,8 +169,5 @@ if __name__ == '__main__':
         aug_data_x = aug.result.copy()
         aug = Augmentor(data_x)  # a single thread object cannot be started more than once
         aug.start()  # run data augmentation of next epoch concurrently with current training
-        nn.fit(x=aug_data_x, y=data_y, batch_size=20)
+        history = nn.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
         epoch_idx += 1
-
-    # Save weights to file
-    nn.save_weights(spec["path"])
