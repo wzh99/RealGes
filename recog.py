@@ -9,7 +9,6 @@ import numpy as np
 import gesture
 import model
 import preproc
-import train
 from capture import Recorder
 
 
@@ -18,14 +17,14 @@ class Recognizer(Thread):
     Recognizer thread that runs in parallel with recorder thread
     """
 
-    def __init__(self, mdl: keras.Model, sample: List[np.ndarray]):
+    def __init__(self, hrn: keras.Model, sample: List[np.ndarray]):
         """
         Constructor
-        :param mdl: a Keras model used to recognize recorded gesture
+        :param hrn: a Keras model used to recognize recorded gesture
         :param sample: [depth_chan, grad_chan]
         """
         super().__init__()
-        self.model = mdl
+        self.hrn = hrn
         self.sample = sample
 
     def run(self) -> None:
@@ -43,15 +42,16 @@ class Recognizer(Thread):
         data = preproc.normalize_sample(data)
 
         # Pass to model for prediction result
-        result = self.model.predict(np.array([data]))
+        result = self.hrn.predict(np.array([data]))
         index = np.argmax(result[0])
         print("gesture: %s" % gesture.category_names[index])
 
 
 if __name__ == '__main__':
-    nn = model.CNN3D()
-    if not os.path.exists(train.weights_path):
-        raise RuntimeError("Weight file not found. Cannot run gesture recognition program.")
-    nn.load_weights(train.weights_path)
-    rec = Recorder(callback=lambda seq: Recognizer(nn, seq).run())
+    hrn_spec = model.network_spec["hrn"]
+    hrn_model = hrn_spec["init"]()
+    if not os.path.exists(hrn_spec["path"]):
+        raise RuntimeError("HRN weight file not found.")
+    hrn_model.load_weights(hrn_spec["path"])
+    rec = Recorder(callback=lambda seq: Recognizer(hrn_model, seq).run())
     rec.record()

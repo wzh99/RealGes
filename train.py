@@ -1,5 +1,5 @@
 import os
-import random as rd
+from random import Random
 from threading import Thread
 
 import cv2
@@ -11,8 +11,7 @@ import load
 import model
 import preproc
 
-weights_path = "cnn3d.h5"
-epochs = 10
+num_epochs = 20
 
 
 class Augmentor(Thread):
@@ -47,7 +46,7 @@ class Augmentor(Thread):
         self.max_clip_len = clip_ratio * original.shape[2]
         assert temporal_elastic_range < 1
         self.temporal_elastic_range = temporal_elastic_range
-        self.rng = rd.Random()
+        self.rng = Random()
         self.result = np.ndarray([len(original), model.input_length, model.input_height,
                                   model.input_width, 2], dtype=np.float32)
 
@@ -103,7 +102,8 @@ class Augmentor(Thread):
             result[chan_idx] = preproc.temporal_resample(chan_seq, seq_len)
 
         # Apply temporal elastic deformation
-        power = 1. / self.rng.uniform(1 - self.temporal_elastic_range, 1 + self.temporal_elastic_range)
+        power = 1. / self.rng.uniform(1 - self.temporal_elastic_range,
+                                      1 + self.temporal_elastic_range)
         for chan_idx in range(2):
             orig_channel = result[chan_idx].copy()
             for dst_idx in range(seq_len):
@@ -119,20 +119,54 @@ class Augmentor(Thread):
         return preproc.normalize_sample(result)
 
 
+class ExitListener(Thread):
+    """
+    A daemon thread that polls enter key and inform training program to exit.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.setDaemon(True)
+        self.exit = False
+
+    def run(self) -> None:
+        while True:
+            if not input():
+                self.exit = True
+                print("Will exit when this epoch is finished.")
+                break
+
+
 if __name__ == '__main__':
-    nn = model.CNN3D()
+    # Build network model
+    spec = model.network_spec["hrn"]
+    nn = spec["init"]()
+
+    # Load dataset from file and initialize data augmentation
     data_x, data_y = load.from_hdf5("dataset.h5")
     data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
     aug = Augmentor(data_x)
     aug.start()
-    if os.path.exists(weights_path):
+
+    # Possibly load weight file if it is found
+    if os.path.exists(spec["path"]):
         print("Weight file is found, fine-tune on existing weights.")
-        nn.load_weights(weights_path)
-    for epoch_idx in range(epochs):
-        print("Epoch %d/%d" % (epoch_idx, epochs))
+        nn.load_weights(spec["path"])
+
+    # Start exit listener thread
+    listener = ExitListener()
+    listener.start()
+
+    # Training loop
+    epoch_idx = 0
+    while not listener.exit and epoch_idx < num_epochs:
+        print("Epoch %d/%d" % (epoch_idx, num_epochs))
         aug.join()
         aug_data_x = aug.result.copy()
         aug = Augmentor(data_x)  # a single thread object cannot be started more than once
-        aug.start()  # run augmentation of next epoch concurrently with model training
+        aug.start()  # run data augmentation of next epoch concurrently with current training
         nn.fit(x=aug_data_x, y=data_y, batch_size=20)
-    nn.save_weights(weights_path)
+        epoch_idx += 1
+
+    # Save weights to file
+    nn.save_weights(spec["path"])

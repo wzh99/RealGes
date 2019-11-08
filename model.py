@@ -8,12 +8,15 @@ input_length = 32
 input_width = 120
 input_height = 90
 
+"""
+Hand Gesture Recognition with 3D Convolutional Neural Networks by Molchanov et al.
+"""
 
-class CNN3D(Sequential):
-    """
-    Hand Gesture Recognition with 3D Convolutional Neural Networks by Molchanov et al.
-    """
 
+class HRN(Sequential):
+    """
+    High resolution network.
+    """
     def __init__(self):
         # Construct base sequential model
         super().__init__()
@@ -21,7 +24,7 @@ class CNN3D(Sequential):
         # Main model specification
         # Convolutional layers
         input_shape = [input_length, input_height, input_width, 2]
-        self.add(Conv3D(4, (5, 7, 7), input_shape=input_shape, data_format="channels_last"))
+        self.add(Conv3D(4, (5, 7, 7), input_shape=input_shape))
         self.add(MaxPooling3D(pool_size=(1, 2, 2)))
         self.add(Activation("relu"))
 
@@ -53,3 +56,15 @@ class CNN3D(Sequential):
         # Compile models in constructor, since its compiling configuration is fixed
         opt = keras.optimizers.SGD(learning_rate=0.005, momentum=0.9, nesterov=True)
         self.compile(opt, loss="categorical_crossentropy", metrics=["accuracy"])
+
+
+network_spec = {
+    "hrn": {
+        "init": HRN,
+        "path": "hrn.h5"
+    },
+    "lrn": {
+        "init": None,
+        "path": "lrn.h5"
+    }
+}

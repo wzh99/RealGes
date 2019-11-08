@@ -283,13 +283,13 @@ class Delay(Thread):
     Delay a fixed length of time.
     """
 
-    def __init__(self, len: float):
+    def __init__(self, delay_len: float):
         """
         Constructor
         :param len: time to be delayed, in seconds
         """
         super().__init__()
-        self.len = len
+        self.len = delay_len
 
     def run(self) -> None:
         time.sleep(self.len)
