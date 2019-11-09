@@ -2,5 +2,5 @@
 .vscode
 data
 __pycache__
-weights
+backup
 *.h5

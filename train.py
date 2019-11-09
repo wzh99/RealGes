@@ -111,10 +111,6 @@ class Augmentor(Thread):
                 src_idx = int(np.minimum(src_idx, seq_len - 1))
                 result[chan_idx][dst_idx] = orig_channel[src_idx]
 
-        # Possibly reverse sequence
-        if self.rng.random() < 0.3:
-            result = np.flip(result, axis=1)
-
         # Normalize data channel-wise and return
         return preproc.normalize_sample(result)
 

@@ -9,4 +9,14 @@ category_names = [
     "expand",
     "good",
     "shake",
+    "one",
+    "two",
+    "three",
+    "ok",
+    "come_on",
+    "fist",
+    "zigzag",
+    "knock",
+    "rock",
+    "gun"
 ]
