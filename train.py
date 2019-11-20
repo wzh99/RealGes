@@ -1,17 +1,18 @@
 import os
+import time
 from random import Random
 from threading import Thread
 
 import cv2
 import keras
+from keras import backend as K
+from keras.callbacks import ModelCheckpoint, TensorBoard
 import numpy as np
 
 import gesture
 import load
 import model
 import preproc
-
-num_epochs = 20
 
 
 class Augmentor(Thread):
@@ -133,37 +134,75 @@ class ExitListener(Thread):
                 break
 
 
+class Trainer:
+    """
+    Trains network with gesture data.
+    """
+
+    def __init__(self, spec: dict, data_path: str, patience: int = 10, decay: float = 0.5):
+        """
+        Constructor
+        :param spec: dict object specifying constructor and weight path of a model
+        :param data_path: where to load data file (in HDF5 format)
+        :param patience: number of epochs that can be waited until a learning rate decay
+        :param decay: decaying rate of learning rate
+        """
+        # Initialize members
+        self.spec = spec
+        self.model: keras.models.Model = spec["init"]()
+        self.data_path = data_path
+        self.patience = patience
+        assert decay < 1
+        self.decay = decay
+
+        # Possibly load weight file if it is found
+        if os.path.exists(self.spec["path"]):
+            print("Model file is found.")
+            self.model.load_weights(spec["path"])
+
+    def train(self, num_epochs: int):
+        """
+        Perform main training work on the specified model.
+        """
+        # Load dataset from file and initialize data augmentation
+        data_x, data_y = load.from_hdf5(self.data_path)
+        data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
+        aug = Augmentor(data_x)
+        aug.start()
+
+        # Start exit listener thread
+        listener = ExitListener()
+        listener.start()
+
+        # Set training callback
+        checkpoint = ModelCheckpoint(self.spec["path"], monitor="loss", verbose=1, 
+                                     save_best_only=True)
+
+        # Training loop
+        epoch_idx = 0
+        last_update = 0  # last epoch we got a lower loss or updated learning rate
+        lowest_loss = float("inf")
+
+        while not listener.exit and epoch_idx < num_epochs:
+            print("Epoch %d/%d" % (epoch_idx, num_epochs))
+            aug.join()
+            aug_data_x = aug.result.copy()
+            aug = Augmentor(data_x)  # a single thread object cannot be started more than once
+            aug.start()  # run data augmentation of next epoch concurrently with current training
+            history = self.model.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
+            cur_loss = history.history["loss"][0]
+            if cur_loss < lowest_loss:
+                last_update = epoch_idx
+                lowest_loss = cur_loss
+            elif epoch_idx - last_update > self.patience:
+                learning_rate = K.get_value(self.model.optimizer.lr)
+                new_rate = learning_rate * self.decay
+                print("Learning rate decayed to %f" % (new_rate))
+                K.set_value(self.model.optimizer.lr, new_rate)
+                last_update = epoch_idx
+            epoch_idx += 1
+
+
 if __name__ == '__main__':
-    # Build network model
-    spec = model.network_spec["lrn"]
-    nn = spec["init"]()
-
-    # Load dataset from file and initialize data augmentation
-    data_x, data_y = load.from_hdf5("dataset.h5")
-    data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
-    aug = Augmentor(data_x)
-    aug.start()
-
-    # Possibly load weight file if it is found
-    if os.path.exists(spec["path"]):
-        print("Weight file is found, fine-tune on existing weights.")
-        nn.load_weights(spec["path"])
-
-    # Start exit listener thread
-    listener = ExitListener()
-    listener.start()
-
-    # Set model checkpoint callback
-    checkpoint = keras.callbacks.ModelCheckpoint(spec["path"], monitor="loss", verbose=1,
-                                                 save_best_only=True, save_weights_only=True)
-
-    # Training loop
-    epoch_idx = 0
-    while not listener.exit and epoch_idx < num_epochs:
-        print("Epoch %d/%d" % (epoch_idx, num_epochs))
-        aug.join()
-        aug_data_x = aug.result.copy()
-        aug = Augmentor(data_x)  # a single thread object cannot be started more than once
-        aug.start()  # run data augmentation of next epoch concurrently with current training
-        history = nn.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
-        epoch_idx += 1
+    trainer = Trainer(model.network_spec["hrn"], "dataset.h5")
+    trainer.train(100)

@@ -49,7 +49,7 @@ class Recognizer(Thread):
 
 
 if __name__ == '__main__':
-    hrn_spec = model.network_spec["lrn"]
+    hrn_spec = model.network_spec["hrn"]
     hrn_model = hrn_spec["init"]()
     if not os.path.exists(hrn_spec["path"]):
         raise RuntimeError("HRN weight file not found.")
