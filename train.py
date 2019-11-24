@@ -8,6 +8,7 @@ import keras
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint, TensorBoard
 import numpy as np
+import pandas as pd
 
 import gesture
 import load
@@ -137,19 +138,24 @@ class ExitListener(Thread):
 class Trainer:
     """
     Trains network with gesture data.
+    Since online data augmentation is applied, input data is different every epoch. only one epoch 
+    can be trained on each call to keras.models.Model.fit(). As a result, the built-in learning rate 
+    adjustment procedure and Tensorboard could not be used. We implement their alternatives in this 
+    class.
     """
 
-    def __init__(self, spec: dict, data_path: str, patience: int = 10, decay: float = 0.5):
+    def __init__(self, model_name: str, data_path: str, patience: int = 10, decay: float = 0.5):
         """
         Constructor
-        :param spec: dict object specifying constructor and weight path of a model
+        :param model_name: key in model.network_spec
         :param data_path: where to load data file (in HDF5 format)
         :param patience: number of epochs that can be waited until a learning rate decay
-        :param decay: decaying rate of learning rate
+        :param decay: decaying factor of learning rate
         """
         # Initialize members
-        self.spec = spec
-        self.model: keras.models.Model = spec["init"]()
+        self.name = model_name
+        self.spec = model.network_spec[model_name]
+        self.model: keras.models.Model = self.spec["init"]()
         self.data_path = data_path
         self.patience = patience
         assert decay < 1
@@ -158,7 +164,7 @@ class Trainer:
         # Possibly load weight file if it is found
         if os.path.exists(self.spec["path"]):
             print("Model file is found.")
-            self.model.load_weights(spec["path"])
+            self.model.load_weights(self.spec["path"])
 
     def train(self, num_epochs: int):
         """
@@ -177,6 +183,9 @@ class Trainer:
         # Set training callback
         checkpoint = ModelCheckpoint(self.spec["path"], monitor="loss", verbose=1, 
                                      save_best_only=True)
+        
+        # Create training log dataframe
+        log = pd.DataFrame(columns=["epoch", "loss", "accuracy"])
 
         # Training loop
         epoch_idx = 0
@@ -188,13 +197,15 @@ class Trainer:
             aug.join()
             aug_data_x = aug.result.copy()
             aug = Augmentor(data_x)  # a single thread object cannot be started more than once
-            aug.start()  # run data augmentation of next epoch concurrently with current training
+            aug.start()  # run data augmentation of next epoch concurrently with current epoch
             history = self.model.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
             cur_loss = history.history["loss"][0]
+            cur_accu = history.history["accuracy"][0]
+            log.at[epoch_idx] = [int(epoch_idx + 1), cur_loss, cur_accu]
             if cur_loss < lowest_loss:
                 last_update = epoch_idx
                 lowest_loss = cur_loss
-            elif epoch_idx - last_update > self.patience:
+            elif epoch_idx - last_update >= self.patience:
                 learning_rate = K.get_value(self.model.optimizer.lr)
                 new_rate = learning_rate * self.decay
                 print("Learning rate decayed to %f" % (new_rate))
@@ -202,7 +213,10 @@ class Trainer:
                 last_update = epoch_idx
             epoch_idx += 1
 
+        # Save log to file
+        log.to_csv(path_or_buf="log_%s.csv" % (self.name), index=False)
+
 
 if __name__ == '__main__':
-    trainer = Trainer(model.network_spec["hrn"], "dataset.h5")
-    trainer.train(100)
+    trainer = Trainer("lrn", "dataset.h5")
+    trainer.train(200)
