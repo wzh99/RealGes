@@ -17,8 +17,9 @@ image_height = 480
 record_fps = 16
 start_depth_diff = 5  # mean difference of test dequeue indicating beginning of record
 finish_depth_diff = 4.5  # mean difference of test dequeue indicating end of record
-min_seq_length = 14
+min_seq_length = 12
 test_deque_size = 5  # size of frames temporarily stored in test dequeue
+window_scale = 0.5  # scale of image in display window
 
 
 class Camera:
@@ -210,7 +211,6 @@ class Recorder:
         :return: None
         """
         # Scale image to a suitable size
-        window_scale = 0.7
         scaled_width = int(image_width * window_scale)
         scaled_height = int(image_height * window_scale)
         stacked = cv2.resize(np.hstack(frame), (2 * scaled_width, scaled_height))

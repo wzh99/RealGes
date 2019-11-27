@@ -3,5 +3,6 @@
 data
 __pycache__
 backup
+demo
 *.h5
 *.csv
