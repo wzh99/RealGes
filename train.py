@@ -1,14 +1,13 @@
 import os
-import time
 from random import Random
 from threading import Thread
 
 import cv2
 import keras
-from keras import backend as K
-from keras.callbacks import ModelCheckpoint, TensorBoard
 import numpy as np
 import pandas as pd
+from keras import backend as K
+from keras.callbacks import ModelCheckpoint
 
 import gesture
 import load
@@ -38,6 +37,7 @@ class Augmentor(Thread):
         :param temporal_elastic_range: 1 +- power in temporal elastic deformation curve
         """
         super().__init__()
+        self.setDaemon(True)
         self.original = original
         self.rotation_range = rotation_range
         assert scale_ratio < 1
@@ -194,14 +194,25 @@ class Trainer:
 
         while not listener.exit and epoch_idx < num_epochs:
             print("Epoch %d/%d" % (epoch_idx, num_epochs))
+
+            # Wait for data augmentation to finish
             aug.join()
-            aug_data_x = aug.result.copy()
+            aug_data_x = aug.result
+            aug.result = None
+
+            # Run data augmentation of next epoch concurrently with training of current one
             aug = Augmentor(data_x)  # a single thread object cannot be started more than once
-            aug.start()  # run data augmentation of next epoch concurrently with current epoch
+            aug.start()
+
+            # Train model with augmented data
             history = self.model.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
+
+            # Get training metrics from history object
             cur_loss = history.history["loss"][0]
             cur_accu = history.history["accuracy"][0]
             log.at[epoch_idx] = [int(epoch_idx + 1), cur_loss, cur_accu]
+
+            # Update learning rate if necessary
             if cur_loss < lowest_loss:
                 last_update = epoch_idx
                 lowest_loss = cur_loss
@@ -214,7 +225,7 @@ class Trainer:
             epoch_idx += 1
 
         # Save log to file
-        log.to_csv(path_or_buf="log_%s.csv" % (self.name), index=False)
+        log.to_csv(path_or_buf="log_%s.csv" % self.name, index=False)
 
 
 if __name__ == '__main__':
