@@ -19,7 +19,7 @@ start_depth_diff = 5  # mean difference of test dequeue indicating beginning of 
 finish_depth_diff = 4.5  # mean difference of test dequeue indicating end of record
 min_seq_length = 12
 test_deque_size = 5  # size of frames temporarily stored in test dequeue
-window_scale = 0.5  # scale of image in display window
+window_scale = 0.6  # scale of image in display window
 
 
 class Camera:
@@ -33,9 +33,11 @@ class Camera:
         config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, 30)
         config.enable_stream(rs.stream.color, image_width, image_height, rs.format.bgr8, 30)
         profile = self.pipeline.start(config)
+
         # Get depth sensor's scale
         depth_sensor = profile.get_device().first_depth_sensor()
         self.depth_scale = depth_sensor.get_depth_scale()
+        
         # Create align object
         self.align = rs.align(rs.stream.color)
 

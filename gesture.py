@@ -17,6 +17,6 @@ category_names = [
     "fist",
     "zigzag",
     "knock",
-    "rock",
+    "i_love_you",
     "gun"
 ]

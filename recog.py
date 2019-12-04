@@ -13,7 +13,7 @@ import preproc
 from capture import Recorder
 
 # Image viewer
-image_size = 400  # size of square images
+image_size = 500  # size of square images
 center = (image_size / 2, image_size / 2)
 identity: np.ndarray = cv2.getRotationMatrix2D((0, 0), 0, 1)  # identity matrix
 translate_amount = 40  # in pixels
