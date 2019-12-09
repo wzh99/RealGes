@@ -45,7 +45,7 @@ def segment_one_frame(captured_list: List[np.ndarray], depth_scale: float) -> Li
     color_mask = _fill_hole(color_mask)
 
     # Combine two masks
-    combined_mask = depth_mask & color_mask
+    combined_mask = depth_mask
 
     # Find contour of the mask
     contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -116,7 +116,7 @@ def normalize_sample(sample: np.ndarray) -> np.ndarray:
         shape: [seq_len, img_height, img_width, num_channels]
         dtype: numpy.float32
     """
-    # Convert to float data type and apply normalization for each channel respectively
+    # Convert to float data type and normalize each channel
     result = np.ndarray(sample.shape, dtype=np.float32)
     for channel_idx in range(2):
         float_data = sample[channel_idx].astype(np.float32) * np.float32(1. / 255)

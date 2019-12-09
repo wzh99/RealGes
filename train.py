@@ -10,7 +10,7 @@ from keras import backend as K
 from keras.callbacks import ModelCheckpoint
 
 import gesture
-import load
+import data
 import model
 import preproc
 
@@ -205,7 +205,7 @@ class Trainer:
             aug.start()
 
             # Train model with augmented data
-            history = self.model.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
+            history = self.model.fit(x=aug_data_x, y=data_y, batch_size=10, callbacks=[checkpoint])
 
             # Get training metrics from history object
             cur_loss = history.history["loss"][0]
@@ -225,9 +225,9 @@ class Trainer:
             epoch_idx += 1
 
         # Save log to file
-        log.to_csv(path_or_buf="log_%s.csv" % self.name, index=False)
+        log.to_csv(path_or_buf="log/%s.csv" % self.name, index=False)
 
 
 if __name__ == '__main__':
-    trainer = Trainer("lrn", "dataset.h5")
-    trainer.train(200)
+    trainer = Trainer("c3d", "train_data.h5")
+    trainer.train(300)

@@ -123,70 +123,39 @@ class ImageViewer(Thread):
         self.queue.put_nowait(msg)
 
 
-class Recognizer(Thread):
+def recogize_sample(m1: keras.Model, m2: keras.Model, sample: List[np.ndarray], 
+                    viewer: ImageViewer = None):
     """
-    Recognizer thread that runs in parallel with recorder thread
+    Recognize one sample combining result of two models
+    :param m1: first model
+    :param m2: second model
+    :param sample: captured but not normalized gesture sample [depth_chan, grad_chan]
+    :param viewer: Image viewer that demonstrate the application of gesture recognition
     """
+    # Rescale image sequence
+    data = np.ndarray([2, model.input_length, model.input_height, model.input_width])
+    for chan_idx in range(2):
+        chan = np.ndarray([0, model.input_height, model.input_width])
+        for frame_idx in range(len(sample[chan_idx])):
+            frame = sample[chan_idx][frame_idx]
+            resized = cv2.resize(frame, (model.input_width, model.input_height))
+            chan = np.append(chan, [resized], axis=0)
+        data[chan_idx] = preproc.temporal_resample(chan, model.input_length)
 
-    def __init__(self, hrn_model: keras.Model, lrn_model: keras.Model, sample: List[np.ndarray],
-                 img_viewer: ImageViewer):
-        """
-        Constructor
-        :param hrn_model: high resolution network model
-        :param lrn_model: low resolution network model
-        :param sample: [depth_chan, grad_chan]
-        :param img_viewer:
-        """
-        super().__init__()
-        self.hrn = hrn_model
-        self.lrn = lrn_model
-        self.sample = sample
-        self.viewer = img_viewer
+    # Normalize sequence
+    data = np.array([preproc.normalize_sample(data)])
 
-    def run(self) -> None:
-        # Rescale image sequence
-        data = np.ndarray([2, model.input_length, model.input_height, model.input_width])
-        for chan_idx in range(2):
-            chan = np.ndarray([0, model.input_height, model.input_width])
-            for frame_idx in range(len(self.sample[chan_idx])):
-                frame = self.sample[chan_idx][frame_idx]
-                resized = cv2.resize(frame, (model.input_width, model.input_height))
-                chan = np.append(chan, [resized], axis=0)
-            data[chan_idx] = preproc.temporal_resample(chan, model.input_length)
-
-        # Normalize sequence
-        data = np.array([preproc.normalize_sample(data)])
-
-        # Pass to model for prediction result
-        result = self.hrn.predict(data) * self.lrn.predict(data)
-        index = np.argmax(result[0])
-        name = gesture.category_names[index]
-        print("gesture: %s" % name)
-        self.viewer.control(name)
-
-
-def load_model_with_weights() -> Tuple[keras.Model, keras.Model]:
-    """
-    Construct model and load weights from file.
-    :return: (hrn_model, lrn_model)
-    """
-    hrn_spec = model.network_spec["hrn"]
-    hrn_model = hrn_spec["init"]()
-    if not os.path.exists(hrn_spec["path"]):
-        raise RuntimeError("HRN weight file not found.")
-    hrn_model.load_weights(hrn_spec["path"])
-
-    lrn_spec = model.network_spec["lrn"]
-    lrn_model = lrn_spec["init"]()
-    if not os.path.exists(lrn_spec["path"]):
-        raise RuntimeError("LRN weight file not found.")
-    lrn_model.load_weights(lrn_spec["path"])
-    return hrn_model, lrn_model
+    # Pass to model for prediction result
+    result = m1.predict(data) if m1 == m2 else m1.predict(data) * m2.predict(data)
+    index = np.argmax(result[0])
+    name = gesture.category_names[index]
+    print("gesture: %s" % name)
+    viewer.control(name)
 
 
 if __name__ == '__main__':
-    hrn, lrn = load_model_with_weights()
+    m1, m2 = model.load_two_models("hrn", "hrn")
     viewer = ImageViewer("demo")
-    rec = Recorder(callback=lambda seq: Recognizer(hrn, lrn, seq, viewer).run())
+    rec = Recorder(callback=lambda seq: recogize_sample(m1, m2, seq, viewer))
     viewer.start()
     rec.record()

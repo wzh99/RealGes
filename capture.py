@@ -260,6 +260,8 @@ class StoreThread(Thread):
 
     def run(self) -> None:
         # Create gesture directory if not found
+        if not os.path.exists(self.path):
+            os.mkdir(self.path)
         gesture_dir = os.path.join(self.path, gesture.category_names[self.gesture])
         if not os.path.exists(gesture_dir):
             os.mkdir(gesture_dir)
@@ -297,6 +299,6 @@ class Delay(Thread):
 
 
 if __name__ == '__main__':
-    rec = Recorder(path="data")
+    rec = Recorder(path="test_data")
     # rec = Recorder()
     rec.record()

@@ -99,5 +99,5 @@ def from_hdf5(path: str) -> Tuple[np.ndarray, np.ndarray]:
 
 
 if __name__ == '__main__':
-    x, y = from_directory("data")
-    _store_as_hdf5("dataset.h5", x, y)
+    x, y = from_directory("test_data")
+    _store_as_hdf5("test_data.h5", x, y)
