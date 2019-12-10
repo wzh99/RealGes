@@ -122,10 +122,5 @@ def normalize_sample(sample: np.ndarray) -> np.ndarray:
         float_data = sample[channel_idx].astype(np.float32) * np.float32(1. / 255)
         result[channel_idx] = (float_data - float_data.mean()) / float_data.std()
 
-    # Concatenate two channels of sequence depth-wise
-    shape = np.append(sample[0].shape, 1)
-    depth_seq = result[0].reshape(shape)
-    grad_seq = result[1].reshape(shape)
-    result = np.concatenate([depth_seq, grad_seq], axis=3)
-
-    return result
+    # Stack two channels of sequence depth-wise
+    return np.stack([result[0], result[1]], axis=3)

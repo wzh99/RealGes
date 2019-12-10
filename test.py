@@ -69,5 +69,5 @@ if __name__ == "__main__":
     C3D         1.049   0.9410
     """
     data_x, data_y = data.from_hdf5("test_data.h5")
-    tester = ModelTester("c3d", "c3d")
+    tester = ModelTester("lrn", "lrn")
     tester.test(data_x, data_y)

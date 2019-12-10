@@ -38,11 +38,27 @@ def from_directory(path: str) -> Tuple[np.ndarray, np.ndarray]:
     return data_x, data_y
 
 
+def load_one_sample(path: str, gesture_index: int, sample_index: int = 0) -> np.ndarray:
+    """
+    Load one gesture sample from in specified path, with given gesture index and sample index.
+    :param path: where all the gesture samples are stored
+    :param gesture_index: index of gesture category specified in gesture.py
+    :param sample_index: index of sample in this gesture category
+    :return: channel-first gesture sample
+    """
+    gesture_dir = os.path.join(path, gesture.category_names[gesture_index])
+    if not os.path.exists(gesture_dir):
+        raise RuntimeError("Directory not found: %s" % gesture_dir)
+    sample_name = os.listdir(gesture_dir)[sample_index]
+    sample_dir = os.path.join(gesture_dir, sample_name)
+    return _load_one_sequence(sample_dir)
+
+
 def _load_one_sequence(path: str) -> np.ndarray:
     """
-    Load one gesture sequence from file and normalize it.
+    Load one gesture sequence from file and resample to 32 frames.
     :param path: where to load a single sequence
-    :return: normalized gesture sample
+    :return: normalized channel-first gesture sample
         shape: [num_channels, sequence_len, image_height, image_width]
         dtype: numpy.float32
     """

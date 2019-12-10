@@ -171,7 +171,7 @@ class Trainer:
         Perform main training work on the specified model.
         """
         # Load dataset from file and initialize data augmentation
-        data_x, data_y = load.from_hdf5(self.data_path)
+        data_x, data_y = data.from_hdf5(self.data_path)
         data_y = keras.utils.to_categorical(data_y, len(gesture.category_names))
         aug = Augmentor(data_x)
         aug.start()
@@ -182,7 +182,7 @@ class Trainer:
 
         # Set training callback
         checkpoint = ModelCheckpoint(self.spec["path"], monitor="loss", verbose=1, 
-                                     save_best_only=True)
+                                     save_weights_only=True, save_best_only=True)
         
         # Create training log dataframe
         log = pd.DataFrame(columns=["epoch", "loss", "accuracy"])
@@ -205,7 +205,7 @@ class Trainer:
             aug.start()
 
             # Train model with augmented data
-            history = self.model.fit(x=aug_data_x, y=data_y, batch_size=10, callbacks=[checkpoint])
+            history = self.model.fit(x=aug_data_x, y=data_y, batch_size=20, callbacks=[checkpoint])
 
             # Get training metrics from history object
             cur_loss = history.history["loss"][0]
@@ -229,5 +229,5 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    trainer = Trainer("c3d", "train_data.h5")
-    trainer.train(300)
+    trainer = Trainer("lrn", "train_data.h5")
+    trainer.train(200)
