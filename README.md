@@ -46,11 +46,11 @@ rec = Recorder(path="train_data")
 
 深度图
 
-<iframe src="doc/depth.gif"></iframe>
+![](doc/depth.gif)
 
 梯度图：
 
-<iframe src="doc/grad.gif"></iframe>
+![](doc/grad.gif)
 
 ### 封装
 
@@ -119,15 +119,15 @@ tester.test(data_x, data_y)
 
 层 0：
 
-![](doc/l0_f10.jpg)
+
 
 层 1：
 
-![](doc/l1_f5.jpg)
+
 
 层 2：
 
-![](doc/l2_f0.jpg)
+
 
 ## 实时预测
 
