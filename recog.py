@@ -21,7 +21,12 @@ rotate_amount = 30  # in degrees
 scale_amount = 1.2
 
 
-class ImageViewer(Thread):
+class GestureApp:
+    def on_gesture(name: str):
+        pass
+
+
+class ImageViewer(Thread, GestureApp):
     """
     A simple image viewer that demonstrates a possible application of gesture recognition.
     """
@@ -115,7 +120,7 @@ class ImageViewer(Thread):
                                      (image_size, image_size))
         cv2.imshow("Image Viewer", transformed)
 
-    def control(self, msg: str) -> None:
+    def on_gesture(self, msg: str) -> None:
         """
         Add control message to queue
         :param msg: message string to be decoded
@@ -124,7 +129,7 @@ class ImageViewer(Thread):
 
 
 def recogize_sample(m1: keras.Model, m2: keras.Model, sample: List[np.ndarray], 
-                    viewer: ImageViewer = None):
+                    app: GestureApp = None):
     """
     Recognize one sample combining result of two models
     :param m1: first model
@@ -150,7 +155,8 @@ def recogize_sample(m1: keras.Model, m2: keras.Model, sample: List[np.ndarray],
     index = np.argmax(result[0])
     name = gesture.category_names[index]
     print("gesture: %s" % name)
-    viewer.control(name)
+    if app is not None:
+        app.on_gesture(name)
 
 
 if __name__ == '__main__':

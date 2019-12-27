@@ -80,7 +80,6 @@ class Visualizer:
             img_path = os.path.join(gesture_dir, "l%d_f%d.jpg" % (layer_idx, frame_idx))
             cv2.imwrite(img_path, frame_img)
 
-
     @staticmethod
     def _to_uint8(chan: np.ndarray):
         """
@@ -96,7 +95,7 @@ class Visualizer:
 
 
 if __name__ == "__main__":
-    vis = Visualizer("lrn")
+    vis = Visualizer("hrn")
     for gesture_idx in range(len(gesture.category_names)):
         for layer_idx in range(4):
             vis.visualize(layer_idx, "train_data", gesture_idx)

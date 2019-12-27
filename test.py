@@ -26,6 +26,7 @@ class ModelTester:
         :param data_y: truth of category index
         """
         # Normalize data for prediction
+        print(data_x.shape)
         norm_x = np.array([preproc.normalize_sample(sp) for sp in data_x])
 
         # Predict gestures
@@ -61,13 +62,6 @@ class ModelTester:
 
 
 if __name__ == "__main__":
-    """
-    Model       Time    Accuracy
-    HRN + LRN   0.261   0.9896
-    HRN         0.210   0.9618
-    LRN         0.047   0.9757
-    C3D         1.049   0.9410
-    """
     data_x, data_y = data.from_hdf5("test_data.h5")
     tester = ModelTester("lrn", "lrn")
     tester.test(data_x, data_y)
