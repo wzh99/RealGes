@@ -119,16 +119,26 @@ tester.test(data_x, data_y)
 
 层 0：
 
-
+![](doc/layer0.gif)
 
 层 1：
 
-
+![](doc/layer1.gif)
 
 层 2：
 
-
+![](doc/layer2.gif)
 
 ## 实时预测
 
-预测和手势应用程序见 [recog.py](recog.py)
+手势实时预测和相关应用见 [recog.py](recog.py)。为了实现对于采集程序的重用，以及预测程序与手势应用的分离，采用了回调函数。手势应用开发者只需要继承 `GestureApp` 并实现 `on_gesture` 方法，在 `Recorder` 的构造函数中将该应用的对象传入即可。本项目中实现了简单的图片图片查看器 `ImageViewer` 作为 `GestureApp` 的示例。
+
+```
+m1, m2 = model.load_two_models("hrn", "lrn")
+viewer = ImageViewer("demo")
+rec = Recorder(callback=lambda seq: recogize_sample(m1, m2, seq, viewer))
+viewer.start()
+rec.record()
+```
+
+运行该程序即可体验。
